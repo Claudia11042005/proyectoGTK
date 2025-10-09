@@ -1,0 +1,7 @@
+com\example\ordersnormalizer\Application.class
+com\example\ordersnormalizer\model\OrderPayload.class
+com\example\ordersnormalizer\model\Item.class
+com\example\ordersnormalizer\model\EventEnvelope.class
+com\example\ordersnormalizer\model\ShippingAddress.class
+com\example\ordersnormalizer\controller\TestController.class
+com\example\ordersnormalizer\service\NormalizerFunction.class

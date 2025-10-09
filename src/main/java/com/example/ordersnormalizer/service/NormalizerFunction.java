@@ -3,6 +3,7 @@ package com.example.ordersnormalizer.service;
 import com.example.ordersnormalizer.model.EventEnvelope;
 import com.example.ordersnormalizer.model.Item;
 import jakarta.validation.Validation;
+import com.example.ordersnormalizer.model.OrderPayload; 
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +42,9 @@ public class NormalizerFunction {
             try {
                 var violations = validator.validate(envelope.getPayload());
                 if (!violations.isEmpty()) {
-                    sendError(envelope, "VALIDATION_ERROR", violations.iterator().next().getMessage());
+                    var first = violations.iterator().next();
+                    sendError(envelope, "VALIDATION_ERROR",
+                        "Campo inválido: " + first.getPropertyPath() + " - " + first.getMessage());
                     return null;
                 }
                 var payload = envelope.getPayload();
@@ -62,18 +65,28 @@ public class NormalizerFunction {
         };
     }
 
-    private void sendError(EventEnvelope original, String type, String message) {
+    private void sendError(EventEnvelope original, String type, String reason) {
         EventEnvelope errorEvent = new EventEnvelope();
         errorEvent.setVersion("1.0");
         errorEvent.setType("ORDER.ERROR");
         errorEvent.setSource("orders.normalizer");
         errorEvent.setId(UUID.randomUUID().toString());
         errorEvent.setTs(Instant.now().toString());
+
         Map<String, Object> err = new HashMap<>();
         err.put("type", type);
-        err.put("message", message);
+        err.put("reason", reason);
+        err.put("step", "NORMALIZER");
+        err.put("originalId", original.getId());
+
+        Map<String, Object> payload = new HashMap<>();
+        if (original.getPayload() != null)
+            payload.put("orderId", original.getPayload().getOrderId());
+        errorEvent.setPayload((OrderPayload) null); // o payload vacío si quieres mantener la estructura simple
+
         errorEvent.setError(err);
-        streamBridge.send(System.getenv().getOrDefault("TOPIC_EVENTS_ERROR", "dev.events.error.v1"), errorEvent);
-        System.err.println("Error published: " + message);
+        streamBridge.send(System.getenv().getOrDefault("TOPIC_EVENTS_ERROR", "dev/events/error/v1"), errorEvent);
+        System.err.println("Error published: " + reason);
     }
+
 }

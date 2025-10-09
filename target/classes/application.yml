@@ -1,0 +1,21 @@
+spring:
+  cloud:
+    function:
+      definition: normalize
+
+    stream:
+      binders:
+        solace:
+          type: solace
+          environment:
+            solace:
+              host: ${SOLACE_HOST:tcps://mr-connection-j4qf9k8b3wh.messaging.solace.cloud:55443}
+              vpn: ${SOLACE_VPN:order-1}
+              username: ${SOLACE_USERNAME:solace-cloud-client}
+              password: ${SOLACE_PASSWORD:}
+
+      bindings:
+        normalize-in-0:
+          destination: ${TOPIC_ORDERS_CREATED:dev/orders/created/v1}
+        normalize-out-0:
+          destination: ${TOPIC_ORDERS_NORMALIZED:dev/orders/normalized/v1}
