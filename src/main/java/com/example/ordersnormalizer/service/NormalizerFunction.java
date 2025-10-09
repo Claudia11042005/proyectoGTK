@@ -3,6 +3,7 @@ package com.example.ordersnormalizer.service;
 import com.example.ordersnormalizer.model.EventEnvelope;
 import com.example.ordersnormalizer.model.Item;
 import jakarta.validation.Validation;
+import com.example.ordersnormalizer.model.OrderPayload; 
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +42,9 @@ public class NormalizerFunction {
             try {
                 var violations = validator.validate(envelope.getPayload());
                 if (!violations.isEmpty()) {
-                    sendError(envelope, "VALIDATION_ERROR", violations.iterator().next().getMessage());
+                    var first = violations.iterator().next();
+                    sendError(envelope, "VALIDATION_ERROR",
+                        "Campo inválido: " + first.getPropertyPath() + " - " + first.getMessage());
                     return null;
                 }
                 var payload = envelope.getPayload();
@@ -62,18 +65,55 @@ public class NormalizerFunction {
         };
     }
 
-    private void sendError(EventEnvelope original, String type, String message) {
+    private void sendError(EventEnvelope original, String type, String reason) {
         EventEnvelope errorEvent = new EventEnvelope();
         errorEvent.setVersion("1.0");
-        errorEvent.setType("ORDER.ERROR");
+        errorEvent.setType("ORDER_ERROR"); 
         errorEvent.setSource("orders.normalizer");
         errorEvent.setId(UUID.randomUUID().toString());
         errorEvent.setTs(Instant.now().toString());
+
+        // Crear payload mínimo
+        OrderPayload errorPayload = new OrderPayload();
+        if (original.getPayload() != null) {
+            errorPayload.setOrderId(original.getPayload().getOrderId());
+        } else {
+            errorPayload.setOrderId("UNKNOWN");
+        }
+        errorEvent.setPayload(errorPayload);
+
+        // Crear objeto de error
         Map<String, Object> err = new HashMap<>();
         err.put("type", type);
-        err.put("message", message);
+        err.put("reason", reason);
+        err.put("step", "NORMALIZER");
+        err.put("originalId", original.getId());
+
         errorEvent.setError(err);
-        streamBridge.send(System.getenv().getOrDefault("TOPIC_EVENTS_ERROR", "dev.events.error.v1"), errorEvent);
-        System.err.println("Error published: " + message);
+        
+        String errorTopic = System.getenv().getOrDefault("TOPIC_EVENTS_ERROR", "dev/events/error/v1");
+        streamBridge.send(errorTopic, errorEvent);
+        System.err.println("Error published: " + reason);
     }
+
+    private boolean validatePayload(OrderPayload payload) {
+        if (payload.getItems() == null || payload.getItems().isEmpty()) {
+            return false;
+        }
+        
+        for (Item item : payload.getItems()) {
+            if (item.getQty() < 1) {
+                return false;
+            }
+        }
+        
+        // Validar currency ISO-4217
+        Set<String> validCurrencies = Set.of("USD", "GTQ", "MXN", "EUR");
+        if (!validCurrencies.contains(payload.getCurrency())) {
+            return false;
+        }
+        
+        return true;
+    }
+
 }
