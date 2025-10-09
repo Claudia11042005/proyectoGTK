@@ -19,7 +19,6 @@ public class TestController {
 
     @PostMapping("/send")
     public ResponseEntity<?> send(@RequestBody EventEnvelope env) {
-        // 👇 Se usa "env" (el parámetro correcto) y se añade un encabezado opcional
         var topic = System.getenv().getOrDefault("TOPIC_ORDERS_CREATED", "dev/orders/created/v1");
         var message = MessageBuilder.withPayload(env)
                 .setHeaderIfAbsent("contentType", MimeTypeUtils.APPLICATION_JSON_VALUE)
